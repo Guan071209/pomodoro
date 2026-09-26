@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>番茄钟 · 专注计时器</title>
+<style>
+  :root{
+    --bg:#f5f5f7;
+    --card:#ffffff;
+    --text:#1d1d1f;
+    --text-2:#6e6e73;
+    --text-3:#a1a1a6;
+    --line:#e6e6ea;
+    --accent:#ff6b5a;
+    --accent-soft:rgba(255,107,90,.10);
+    --shadow:0 1px 2px rgba(0,0,0,.04), 0 12px 40px rgba(0,0,0,.06);
+    --radius:22px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{height:100%}
+  body{
+    display:flex;
+    min-height:100%;
+    padding:24px;
+    background:
+      radial-gradient(1000px 500px at 50% -12%, #ffffff 0%, rgba(255,255,255,0) 70%),
+      var(--bg);
+    color:var(--text);
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .app{
+    width:100%;
+    max-width:440px;
+    margin:auto;
+    background:var(--card);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:22px 24px 26px;
+    transition:box-shadow .4s ease;
+  }
+  .app.flash{animation:flash 1s ease 2}
+  @keyframes flash{
+    0%,100%{box-shadow:var(--shadow)}
+    50%{box-shadow:0 0 0 6px var(--accent-soft), var(--shadow)}
+  }
+
+  /* ---------- 顶栏 ---------- */
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .brand{font-size:14px;font-weight:600;letter-spacing:.02em}
+  .brand span{color:var(--text-3);font-weight:500;margin-left:6px}
+  .icon-btn{
+    width:32px;height:32px;border:0;border-radius:10px;background:transparent;
+    color:var(--text-2);display:grid;place-items:center;cursor:pointer;
+    transition:background .18s ease,color .18s ease,transform .18s ease;
+  }
+  .icon-btn:hover{background:#f2f2f5;color:var(--text)}
+  .icon-btn:active{transform:scale(.94)}
+  .icon-btn.on{background:var(--accent-soft);color:var(--accent)}
+
+  /* ---------- 模式切换 ---------- */
+  .modes{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:4px;
+    background:#f2f2f5;border-radius:14px;padding:4px;margin-bottom:26px;
+  }
+  .mode-btn{
+    border:0;background:transparent;border-radius:11px;padding:9px 0;
+    font-size:13px;font-weight:500;color:var(--text-2);cursor:pointer;
+    font-family:inherit;transition:color .2s ease,background .2s ease,box-shadow .2s ease;
+  }
+  .mode-btn:hover{color:var(--text)}
+  .mode-btn.is-active{
+    background:#fff;color:var(--text);font-weight:600;
+    box-shadow:0 1px 3px rgba(0,0,0,.07);
+  }
+
+  /* ---------- 表盘 ---------- */
+  .dial-wrap{position:relative;width:100%;max-width:280px;margin:0 auto 24px}
+  .dial{display:block;width:100%;height:auto;transform:rotate(-90deg)}
+  .dial-track{fill:none;stroke:#f0f0f3;stroke-width:12}
+  .dial-progress{
+    fill:none;stroke:var(--accent);stroke-width:12;stroke-linecap:round;
+    transition:stroke-dashoffset .3s linear, stroke .35s ease;
+  }
+  .dial-progress.no-anim{transition:stroke .35s ease}
+  .dial-center{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:6px;
+  }
+  .time{
+    font-size:56px;font-weight:250;letter-spacing:-.02em;line-height:1;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
+  }
+  .label{font-size:12.5px;color:var(--text-3);letter-spacing:.06em}
+
+  /* ---------- 控制按钮 ---------- */
+  .controls{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:22px}
+  .btn{
+    font-family:inherit;cursor:pointer;border:0;border-radius:14px;
+    transition:transform .16s ease,background .18s ease,box-shadow .18s ease,opacity .18s ease;
+  }
+  .btn:active{transform:scale(.96)}
+  .btn.primary{
+    min-width:132px;padding:13px 26px;font-size:15px;font-weight:600;
+    color:#fff;background:var(--accent);
+    box-shadow:0 6px 18px -6px var(--accent);
+  }
+  .btn.primary:hover{filter:brightness(1.04)}
+  .btn.ghost{
+    padding:12px 16px;font-size:13.5px;font-weight:500;
+    color:var(--text-2);background:#f2f2f5;
+  }
+  .btn.ghost:hover{background:#eaeaef;color:var(--text)}
+
+  /* ---------- 番茄进度点 ---------- */
+  .dots{display:flex;justify-content:center;gap:8px;margin-bottom:10px;min-height:10px}
+  .dot{
+    width:8px;height:8px;border-radius:50%;background:#e6e6ea;
+    transition:background .25s ease,transform .25s ease;
+  }
+  .dot.filled{background:var(--accent);transform:scale(1.14)}
+  .today{text-align:center;font-size:12.5px;color:var(--text-3)}
+
+  /* ---------- 白噪音 ---------- */
+  .noise{
+    margin-top:18px;padding:12px 14px;border-radius:16px;
+    background:#f7f7f9;display:grid;gap:11px;
+  }
+  .noise-head{display:flex;align-items:center;gap:10px}
+  .noise-play{
+    width:32px;height:32px;flex:0 0 auto;border:0;border-radius:50%;
+    background:#fff;color:var(--text);display:grid;place-items:center;cursor:pointer;
+    box-shadow:0 1px 3px rgba(0,0,0,.08);
+    transition:background .22s ease,color .22s ease,transform .16s ease,box-shadow .22s ease;
+  }
+  .noise-play:hover{transform:scale(1.06)}
+  .noise-play:active{transform:scale(.93)}
+  .noise.is-playing .noise-play{
+    background:var(--accent);color:#fff;
+    box-shadow:0 5px 14px -5px var(--accent);
+  }
+  .noise-play .ico-pause{display:none}
+  .noise.is-playing .ico-play{display:none}
+  .noise.is-playing .ico-pause{display:block}
+  .noise-name{flex:1;font-size:13px;font-weight:500}
+  .chips{display:flex;gap:3px;background:#eaeaed;border-radius:10px;padding:3px}
+  .chip{
+    border:0;background:transparent;border-radius:8px;padding:5px 10px;
+    font-family:inherit;font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer;
+    transition:background .2s ease,color .2s ease,box-shadow .2s ease;
+  }
+  .chip:hover{color:var(--text)}
+  .chip.is-active{
+    background:#fff;color:var(--text);font-weight:600;
+    box-shadow:0 1px 2px rgba(0,0,0,.08);
+  }
+  .noise-vol{display:flex;align-items:center;gap:9px;color:var(--text-3)}
+  .noise-vol svg{flex:0 0 auto}
+  .noise-vol input[type=range]{
+    -webkit-appearance:none;appearance:none;flex:1;height:4px;border-radius:999px;
+    background:#e2e2e7;outline:none;cursor:pointer;border:0;
+  }
+  .noise-vol input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;
+    background:#fff;border:0;box-shadow:0 1px 4px rgba(0,0,0,.24);cursor:pointer;
+    transition:transform .15s ease;
+  }
+  .noise-vol input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+  .noise-vol input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;background:#fff;border:0;
+    box-shadow:0 1px 4px rgba(0,0,0,.24);cursor:pointer;
+  }
+  .noise-vol input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+  /* ---------- 设置面板 ---------- */
+  .settings{
+    margin-top:20px;padding-top:18px;border-top:1px solid var(--line);
+    display:grid;gap:14px;
+  }
+  .settings[hidden]{display:none}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+  .row .name{font-size:13.5px;color:var(--text)}
+  .row .hint{font-size:11.5px;color:var(--text-3);margin-top:2px}
+  .num{
+    width:74px;padding:8px 10px;font-family:inherit;font-size:13.5px;text-align:center;
+    color:var(--text);background:#f2f2f5;border:1px solid transparent;border-radius:10px;
+    outline:none;font-variant-numeric:tabular-nums;
+    transition:border-color .18s ease,background .18s ease;
+  }
+  .num:focus{background:#fff;border-color:var(--accent)}
+  .switch{position:relative;width:44px;height:26px;flex:0 0 auto;cursor:pointer}
+  .switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+  .switch .track{
+    position:absolute;inset:0;border-radius:999px;background:#e0e0e5;
+    transition:background .22s ease;
+  }
+  .switch .track::after{
+    content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;
+    border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);
+    transition:transform .22s cubic-bezier(.4,0,.2,1);
+  }
+  .switch input:checked + .track{background:var(--accent)}
+  .switch input:checked + .track::after{transform:translateX(18px)}
+  .switch input:focus-visible + .track{outline:2px solid var(--accent);outline-offset:2px}
+
+  .tip{text-align:center;font-size:11.5px;color:var(--text-3);margin-top:16px}
+  kbd{
+    font-family:inherit;font-size:11px;padding:1px 5px;border-radius:5px;
+    background:#f2f2f5;border:1px solid var(--line);color:var(--text-2);
+  }
+
+  @media (max-width:420px){
+    .time{font-size:48px}
+    .btn.primary{min-width:112px}
+    .app{padding:20px 18px 22px}
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand">番茄钟<span>Focus</span></div>
+    <button class="icon-btn" id="settingsBtn" title="设置" aria-label="设置">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+  </header>
+
+  <div class="modes" role="tablist">
+    <button class="mode-btn is-active" data-mode="focus" role="tab">专注</button>
+    <button class="mode-btn" data-mode="short" role="tab">短休息</button>
+    <button class="mode-btn" data-mode="long" role="tab">长休息</button>
+  </div>
+
+  <div class="dial-wrap">
+    <svg class="dial" viewBox="0 0 300 300" aria-hidden="true">
+      <circle class="dial-track" cx="150" cy="150" r="132"></circle>
+      <circle class="dial-progress" id="ring" cx="150" cy="150" r="132"></circle>
+    </svg>
+    <div class="dial-center">
+      <div class="time" id="time">25:00</div>
+      <div class="label" id="label">保持专注</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn ghost" id="resetBtn">重置</button>
+    <button class="btn primary" id="startBtn">开始</button>
+    <button class="btn ghost" id="skipBtn">跳过</button>
+  </div>
+
+  <div class="dots" id="dots"></div>
+  <p class="today" id="today">今日已完成 0 个番茄</p>
+
+  <section class="noise" id="noise">
+    <div class="noise-head">
+      <button class="noise-play" id="noisePlay" aria-pressed="false" title="播放白噪音">
+        <svg class="ico-play" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+          <path d="M8.6 5.6v12.8l10.2-6.4z"></path>
+        </svg>
+        <svg class="ico-pause" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+          <rect x="7.6" y="5.6" width="3.3" height="12.8" rx="1.4"></rect>
+          <rect x="13.1" y="5.6" width="3.3" height="12.8" rx="1.4"></rect>
+        </svg>
+      </button>
+      <div class="noise-name" id="noiseName">白噪音</div>
+      <div class="chips" role="group" aria-label="噪音类型">
+        <button class="chip is-active" data-noise="white">白</button>
+        <button class="chip" data-noise="pink">粉</button>
+        <button class="chip" data-noise="brown">棕</button>
+      </div>
+    </div>
+    <div class="noise-vol">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M11 5 6 9H3v6h3l5 4z"></path>
+        <path d="M15.8 9.2a4 4 0 0 1 0 5.6"></path>
+      </svg>
+      <input type="range" id="noiseVolume" min="0" max="100" step="1" value="40" aria-label="白噪音音量">
+    </div>
+  </section>
+
+  <section class="settings" id="settings" hidden>
+    <div class="row">
+      <div>
+        <div class="name">专注时长</div>
+        <div class="hint">分钟</div>
+      </div>
+      <input class="num" type="number" id="setFocus" min="1" max="180" step="1">
+    </div>
+    <div class="row">
+      <div>
+        <div class="name">短休息</div>
+        <div class="hint">分钟</div>
+      </div>
+      <input class="num" type="number" id="setShort" min="1" max="60" step="1">
+    </div>
+    <div class="row">
+      <div>
+        <div class="name">长休息</div>
+        <div class="hint">分钟</div>
+      </div>
+      <input class="num" type="number" id="setLong" min="1" max="120" step="1">
+    </div>
+    <div class="row">
+      <div>
+        <div class="name">长休息间隔</div>
+        <div class="hint">每完成几个番茄</div>
+      </div>
+      <input class="num" type="number" id="setInterval" min="2" max="12" step="1">
+    </div>
+    <div class="row">
+      <div class="name">自动开始休息</div>
+      <label class="switch"><input type="checkbox" id="setAutoBreak"><span class="track"></span></label>
+    </div>
+    <div class="row">
+      <div class="name">自动开始专注</div>
+      <label class="switch"><input type="checkbox" id="setAutoFocus"><span class="track"></span></label>
+    </div>
+    <div class="row">
+      <div class="name">结束提示音</div>
+      <label class="switch"><input type="checkbox" id="setSound"><span class="track"></span></label>
+    </div>
+  </section>
+
+  <p class="tip">空格 开始/暂停 · <kbd>R</kbd> 重置 · <kbd>S</kbd> 跳过</p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORE_SETTINGS = "pomodoro.settings.v1";
+  var STORE_STATS = "pomodoro.stats.v1";
+  var STORE_NOISE = "pomodoro.noise.v1";
+
+  var RING_R = 132;
+  var CIRC = 2 * Math.PI * RING_R;
+
+  var MODE_META = {
+    focus: { label: "保持专注", accent: "#ff6b5a", key: "focus" },
+    short: { label: "短休息一下", accent: "#34c759", key: "short" },
+    long:  { label: "长休息放松", accent: "#0a84ff", key: "long" }
+  };
+
+  var defaults = {
+    focus: 25,
+    short: 5,
+    long: 15,
+    interval: 4,
+    autoBreak: true,
+    autoFocus: false,
+    sound: true
+  };
+
+  /* ---------------- 存储 ---------------- */
+  function load(key, fallback) {
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      var parsed = JSON.parse(raw);
+      return (parsed && typeof parsed === "object") ? parsed : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+  function save(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+  }
+  function todayKey() {
+    var d = new Date();
+    return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+  }
+
+  var settings = Object.assign({}, defaults, load(STORE_SETTINGS, {}));
+  var stats = load(STORE_STATS, { day: todayKey(), count: 0, completed: 0 });
+  if (stats.day !== todayKey()) stats = { day: todayKey(), count: 0, completed: 0 };
+  if (typeof stats.completed !== "number") stats.completed = 0;
+
+  var noiseSettings = Object.assign({ type: "white", volume: 40 }, load(STORE_NOISE, {}));
+  if (["white", "pink", "brown"].indexOf(noiseSettings.type) < 0) noiseSettings.type = "white";
+  noiseSettings.volume = clamp(int(noiseSettings.volume, 40), 0, 100);
+
+  /* ---------------- 状态 ---------------- */
+  var state = {
+    mode: "focus",
+    running: false,
+    remaining: settings.focus * 60000,
+    endAt: 0,
+    completed: stats.completed,   // 本轮已完成的专注个数
+    timer: null
+  };
+
+  /* ---------------- 元素 ---------------- */
+  var el = {
+    app: document.getElementById("app"),
+    ring: document.getElementById("ring"),
+    time: document.getElementById("time"),
+    label: document.getElementById("label"),
+    start: document.getElementById("startBtn"),
+    reset: document.getElementById("resetBtn"),
+    skip: document.getElementById("skipBtn"),
+    dots: document.getElementById("dots"),
+    today: document.getElementById("today"),
+    settingsBtn: document.getElementById("settingsBtn"),
+    settings: document.getElementById("settings"),
+    noise: document.getElementById("noise"),
+    noisePlay: document.getElementById("noisePlay"),
+    noiseName: document.getElementById("noiseName"),
+    noiseChips: Array.prototype.slice.call(document.querySelectorAll(".chip")),
+    noiseVolume: document.getElementById("noiseVolume"),
+    modeBtns: Array.prototype.slice.call(document.querySelectorAll(".mode-btn"))
+  };
+
+  var inputs = {
+    focus: document.getElementById("setFocus"),
+    short: document.getElementById("setShort"),
+    long: document.getElementById("setLong"),
+    interval: document.getElementById("setInterval"),
+    autoBreak: document.getElementById("setAutoBreak"),
+    autoFocus: document.getElementById("setAutoFocus"),
+    sound: document.getElementById("setSound")
+  };
+
+  el.ring.style.strokeDasharray = CIRC.toFixed(2);
+
+  /* ---------------- 音效 ---------------- */
+  var audioCtx = null;
+  function unlockAudio() {
+    if (audioCtx) return;
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) audioCtx = new Ctx();
+    } catch (e) { audioCtx = null; }
+  }
+  function beep() {
+    if (!settings.sound || !audioCtx) return;
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    var now = audioCtx.currentTime;
+    [0, 0.18, 0.36].forEach(function (offset, i) {
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      var t = now + offset;
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880 - i * 90, t);
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.17);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.2);
+    });
+  }
+
+  /* ---------------- 白噪音 ---------------- */
+  var NOISE_META = {
+    white: { name: "白噪音" },
+    pink: { name: "粉噪音" },
+    brown: { name: "棕噪音" }
+  };
+
+  var noise = {
+    type: noiseSettings.type,
+    volume: noiseSettings.volume,
+    playing: false,
+    source: null,
+    gain: null
+  };
+  var noiseBuffers = {};
+
+  // 实时合成噪音波形：白噪音为均匀随机，粉噪音走 Kellet 滤波，棕噪音走泄漏积分
+  function buildNoiseBuffer(ctx, type) {
+    if (noiseBuffers[type]) return noiseBuffers[type];
+
+    var sr = ctx.sampleRate;
+    var fade = Math.floor(sr * 0.05);
+    var length = Math.floor(sr * 4);
+    var total = length + fade;
+    var raw = new Float32Array(total);
+    var i, w;
+
+    if (type === "pink") {
+      var b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (i = 0; i < total; i++) {
+        w = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + w * 0.0555179;
+        b1 = 0.99332 * b1 + w * 0.0750759;
+        b2 = 0.96900 * b2 + w * 0.1538520;
+        b3 = 0.86650 * b3 + w * 0.3104856;
+        b4 = 0.55000 * b4 + w * 0.5329522;
+        b5 = -0.7616 * b5 - w * 0.0168980;
+        raw[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362;
+        b6 = w * 0.115926;
+      }
+    } else if (type === "brown") {
+      var last = 0;
+      for (i = 0; i < total; i++) {
+        last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+        raw[i] = last;
+      }
+    } else {
+      for (i = 0; i < total; i++) raw[i] = Math.random() * 2 - 1;
+    }
+
+    var buffer = ctx.createBuffer(1, length, sr);
+    var data = buffer.getChannelData(0);
+    for (i = 0; i < length; i++) data[i] = raw[i];
+
+    // 把尾部与头部交叉淡化，抹掉循环接缝处的爆音
+    for (i = 0; i < fade; i++) {
+      var t = i / fade;
+      data[i] = raw[i] * t + raw[length + i] * (1 - t);
+    }
+
+    // 按 RMS 归一化，让三种噪音听感响度一致
+    var sum = 0;
+    for (i = 0; i < length; i++) sum += data[i] * data[i];
+    var scale = 0.2 / (Math.sqrt(sum / length) || 1);
+    for (i = 0; i < length; i++) data[i] *= scale;
+
+    noiseBuffers[type] = buffer;
+    return buffer;
+  }
+
+  function noiseCtx() {
+    unlockAudio();
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }
+
+  function noiseTargetGain() {
+    return Math.pow(noise.volume / 100, 1.8);
+  }
+
+  function rampNoiseGain(value, seconds) {
+    if (!noise.gain || !audioCtx) return;
+    var now = audioCtx.currentTime;
+    var param = noise.gain.gain;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(param.value, now);
+    param.linearRampToValueAtTime(value, now + seconds);
+  }
+
+  function spawnNoiseSource(ctx, type, destination) {
+    var src = ctx.createBufferSource();
+    src.buffer = buildNoiseBuffer(ctx, type);
+    src.loop = true;
+    src.connect(destination);
+    src.start();
+    return src;
+  }
+
+  function startNoise() {
+    var ctx = noiseCtx();
+    if (!ctx) return;
+    if (!noise.gain) {
+      noise.gain = ctx.createGain();
+      noise.gain.gain.value = 0;
+      noise.gain.connect(ctx.destination);
+    }
+    if (noise.source) { try { noise.source.stop(); } catch (e) {} }
+    noise.source = spawnNoiseSource(ctx, noise.type, noise.gain);
+    noise.playing = true;
+    rampNoiseGain(noiseTargetGain(), 0.4);
+    renderNoise();
+  }
+
+  function stopNoise() {
+    if (!noise.playing) return;
+    noise.playing = false;
+    rampNoiseGain(0, 0.3);
+    var src = noise.source;
+    noise.source = null;
+    if (src) setTimeout(function () { try { src.stop(); } catch (e) {} }, 420);
+    renderNoise();
+  }
+
+  function switchNoiseType(type) {
+    if (type === noise.type) return;
+    noise.type = type;
+    noiseSettings.type = type;
+    save(STORE_NOISE, noiseSettings);
+
+    if (noise.playing && noise.source && audioCtx) {
+      var ctx = audioCtx;
+      var now = ctx.currentTime;
+      var old = noise.source;
+      var oldGain = ctx.createGain();
+      old.disconnect();
+      old.connect(oldGain);
+      oldGain.connect(noise.gain);
+      oldGain.gain.setValueAtTime(1, now);
+      oldGain.gain.linearRampToValueAtTime(0.0001, now + 0.25);
+      setTimeout(function () { try { old.stop(); } catch (e) {} }, 320);
+
+      var newGain = ctx.createGain();
+      newGain.gain.setValueAtTime(0.0001, now);
+      newGain.gain.linearRampToValueAtTime(1, now + 0.25);
+      newGain.connect(noise.gain);
+      noise.source = spawnNoiseSource(ctx, type, newGain);
+    }
+    renderNoise();
+  }
+
+  function renderNoise() {
+    var name = NOISE_META[noise.type].name;
+    el.noise.classList.toggle("is-playing", noise.playing);
+    el.noisePlay.setAttribute("aria-pressed", noise.playing ? "true" : "false");
+    el.noisePlay.title = (noise.playing ? "暂停" : "播放") + name;
+    el.noiseName.textContent = name;
+    el.noiseVolume.setAttribute("aria-label", name + "音量");
+    el.noiseChips.forEach(function (chip) {
+      chip.classList.toggle("is-active", chip.dataset.noise === noise.type);
+    });
+    if (el.noiseVolume.value !== String(noise.volume)) el.noiseVolume.value = noise.volume;
+    renderNoiseVolumeTrack();
+  }
+
+  function renderNoiseVolumeTrack() {
+    var pct = noise.volume + "%";
+    el.noiseVolume.style.background =
+      "linear-gradient(90deg, var(--accent) 0%, var(--accent) " + pct +
+      ", #e2e2e7 " + pct + ", #e2e2e7 100%)";
+  }
+
+  /* ---------------- 渲染 ---------------- */
+  function durationMs(mode) {
+    return settings[mode] * 60000;
+  }
+  function totalMs() {
+    return durationMs(state.mode);
+  }
+  function pad(n) {
+    return (n < 10 ? "0" : "") + n;
+  }
+
+  function renderTime() {
+    var ms = Math.max(0, state.remaining);
+    var totalSec = Math.ceil(ms / 1000);
+    var mm = Math.floor(totalSec / 60);
+    var ss = totalSec % 60;
+    var text = pad(mm) + ":" + pad(ss);
+    if (el.time.textContent !== text) el.time.textContent = text;
+    document.title = (state.running ? text + " · " : "") +
+      MODE_META[state.mode].label + " · 番茄钟";
+  }
+
+  function renderRing(animate) {
+    var ratio = totalMs() > 0 ? Math.max(0, Math.min(1, state.remaining / totalMs())) : 0;
+    el.ring.classList.toggle("no-anim", animate === false);
+    el.ring.style.strokeDashoffset = (CIRC * (1 - ratio)).toFixed(2);
+    if (animate === false) {
+      // 强制重排后恢复过渡，避免重置时出现回卷动画
+      void el.ring.getBoundingClientRect();
+      el.ring.classList.remove("no-anim");
+    }
+  }
+
+  function renderDots() {
+    var total = settings.interval;
+    var filled = state.completed % total;
+    if (filled === 0 && state.completed > 0 && state.mode === "long") filled = total;
+    if (el.dots.children.length !== total) {
+      el.dots.innerHTML = "";
+      for (var i = 0; i < total; i++) {
+        var d = document.createElement("span");
+        d.className = "dot";
+        el.dots.appendChild(d);
+      }
+    }
+    for (var j = 0; j < el.dots.children.length; j++) {
+      el.dots.children[j].classList.toggle("filled", j < filled);
+    }
+  }
+
+  function renderToday() {
+    el.today.textContent = "今日已完成 " + stats.count + " 个番茄";
+  }
+
+  function renderMode() {
+    var meta = MODE_META[state.mode];
+    document.documentElement.style.setProperty("--accent", meta.accent);
+    document.documentElement.style.setProperty(
+      "--accent-soft",
+      hexToRgba(meta.accent, 0.12)
+    );
+    el.label.textContent = meta.label;
+    el.modeBtns.forEach(function (b) {
+      b.classList.toggle("is-active", b.dataset.mode === state.mode);
+    });
+    renderRing(false);
+    renderDots();
+  }
+
+  function hexToRgba(hex, alpha) {
+    var h = hex.replace("#", "");
+    var r = parseInt(h.substring(0, 2), 16);
+    var g = parseInt(h.substring(2, 4), 16);
+    var b = parseInt(h.substring(4, 6), 16);
+    return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
+  }
+
+  function renderStartButton() {
+    el.start.textContent = state.running ? "暂停" : "开始";
+  }
+
+  /* ---------------- 计时 ---------------- */
+  function tick() {
+    if (!state.running) return;
+    state.remaining = state.endAt - Date.now();
+    if (state.remaining <= 0) {
+      state.remaining = 0;
+      renderTime();
+      renderRing();
+      finish(false);
+      return;
+    }
+    renderTime();
+    renderRing();
+  }
+
+  function start() {
+    if (state.running) return;
+    unlockAudio();
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    state.running = true;
+    state.endAt = Date.now() + state.remaining;
+    clearInterval(state.timer);
+    state.timer = setInterval(tick, 200);
+    renderStartButton();
+    renderTime();
+  }
+
+  function pause() {
+    if (!state.running) return;
+    state.running = false;
+    state.remaining = Math.max(0, state.endAt - Date.now());
+    clearInterval(state.timer);
+    state.timer = null;
+    renderStartButton();
+    renderRing(false);
+    renderTime();
+  }
+
+  function stop() {
+    clearInterval(state.timer);
+    state.timer = null;
+    state.running = false;
+  }
+
+  function reset() {
+    stop();
+    state.remaining = totalMs();
+    renderStartButton();
+    renderRing(false);
+    renderTime();
+  }
+
+  function setMode(mode, keepRunning) {
+    stop();
+    state.mode = mode;
+    state.remaining = totalMs();
+    renderMode();
+    renderStartButton();
+    renderTime();
+    renderRing(false);
+    if (keepRunning) start();
+  }
+
+  function finish(manual) {
+    stop();
+    var wasFocus = state.mode === "focus";
+    var next;
+
+    if (manual) {
+      next = wasFocus ? "short" : "focus";
+    } else {
+      beep();
+      el.app.classList.remove("flash");
+      void el.app.offsetWidth;
+      el.app.classList.add("flash");
+      if (wasFocus) {
+        state.completed += 1;
+        stats.count += 1;
+        stats.completed = state.completed;
+        save(STORE_STATS, stats);
+        next = (state.completed % settings.interval === 0) ? "long" : "short";
+      } else {
+        if (state.mode === "long") {
+          state.completed = 0;
+          stats.completed = 0;
+          save(STORE_STATS, stats);
+        }
+        next = "focus";
+      }
+      renderToday();
+    }
+
+    var autoStart = manual ? false : (wasFocus ? settings.autoBreak : settings.autoFocus);
+    setMode(next, autoStart);
+  }
+
+  /* ---------------- 设置 ---------------- */
+  function applySettings() {
+    settings.focus = clamp(int(inputs.focus.value, defaults.focus), 1, 180);
+    settings.short = clamp(int(inputs.short.value, defaults.short), 1, 60);
+    settings.long = clamp(int(inputs.long.value, defaults.long), 1, 120);
+    settings.interval = clamp(int(inputs.interval.value, defaults.interval), 2, 12);
+    settings.autoBreak = inputs.autoBreak.checked;
+    settings.autoFocus = inputs.autoFocus.checked;
+    settings.sound = inputs.sound.checked;
+    save(STORE_SETTINGS, settings);
+    if (!state.running) {
+      state.remaining = totalMs();
+      renderTime();
+      renderRing(false);
+    }
+    renderDots();
+  }
+
+  function int(value, fallback) {
+    var n = parseInt(value, 10);
+    return isNaN(n) ? fallback : n;
+  }
+  function clamp(n, min, max) {
+    return Math.min(max, Math.max(min, n));
+  }
+
+  function fillSettingsForm() {
+    inputs.focus.value = settings.focus;
+    inputs.short.value = settings.short;
+    inputs.long.value = settings.long;
+    inputs.interval.value = settings.interval;
+    inputs.autoBreak.checked = settings.autoBreak;
+    inputs.autoFocus.checked = settings.autoFocus;
+    inputs.sound.checked = settings.sound;
+  }
+
+  /* ---------------- 事件 ---------------- */
+  el.start.addEventListener("click", function () {
+    state.running ? pause() : start();
+  });
+
+  el.reset.addEventListener("click", reset);
+
+  el.skip.addEventListener("click", function () {
+    finish(true);
+  });
+
+  el.modeBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      if (btn.dataset.mode === state.mode && !state.running) {
+        reset();
+        return;
+      }
+      setMode(btn.dataset.mode, false);
+    });
+  });
+
+  el.settingsBtn.addEventListener("click", function () {
+    var hidden = el.settings.hasAttribute("hidden");
+    if (hidden) {
+      el.settings.removeAttribute("hidden");
+      el.settingsBtn.classList.add("on");
+      inputs.focus.focus();
+    } else {
+      el.settings.setAttribute("hidden", "");
+      el.settingsBtn.classList.remove("on");
+      applySettings();
+    }
+  });
+
+  Object.keys(inputs).forEach(function (key) {
+    inputs[key].addEventListener("change", applySettings);
+    inputs[key].addEventListener("input", function () {
+      if (inputs[key].type === "number") applySettings();
+    });
+  });
+
+  el.noisePlay.addEventListener("click", function () {
+    if (noise.playing) stopNoise();
+    else startNoise();
+  });
+
+  el.noiseChips.forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      switchNoiseType(chip.dataset.noise);
+    });
+  });
+
+  var noiseSaveTimer = null;
+  function scheduleNoiseSave() {
+    clearTimeout(noiseSaveTimer);
+    noiseSaveTimer = setTimeout(function () {
+      save(STORE_NOISE, noiseSettings);
+    }, 200);
+  }
+
+  el.noiseVolume.addEventListener("input", function () {
+    noise.volume = clamp(int(el.noiseVolume.value, 40), 0, 100);
+    noiseSettings.volume = noise.volume;
+    if (noise.playing) rampNoiseGain(noiseTargetGain(), 0.08);
+    renderNoiseVolumeTrack();
+    scheduleNoiseSave();
+  });
+
+  el.noiseVolume.addEventListener("change", function () {
+    clearTimeout(noiseSaveTimer);
+    save(STORE_NOISE, noiseSettings);
+  });
+
+  document.addEventListener("keydown", function (e) {
+    var tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    if (e.code === "Space" || e.key === " ") {
+      e.preventDefault();
+      state.running ? pause() : start();
+    } else if (e.key === "r" || e.key === "R") {
+      reset();
+    } else if (e.key === "s" || e.key === "S") {
+      finish(true);
+    }
+  });
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && state.running) tick();
+  });
+
+  /* ---------------- 初始化 ---------------- */
+  fillSettingsForm();
+  renderMode();
+  renderToday();
+  renderStartButton();
+  renderTime();
+  renderNoise();
+
+  // 视觉上先铺满圆环
+  el.ring.style.strokeDashoffset = "0";
+})();
+</script>
+</body>
+</html>
